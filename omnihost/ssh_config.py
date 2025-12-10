@@ -67,7 +67,8 @@ def get_all_hosts() -> List[Dict[str, str]]:
                 'hostname': host_config.get('hostname', 'N/A'),
                 'user': host_config.get('user', 'N/A'),
                 'port': str(host_config.get('port', '22')),
-                'identityfile': host_config.get('identityfile', ['N/A'])[0] if host_config.get('identityfile') else 'N/A'
+                'identityfile': host_config.get('identityfile', ['N/A'])[0] if host_config.get('identityfile') else 'N/A',
+                'proxyjump': host_config.get('proxyjump', 'N/A')
             })
     except Exception as e:
         console.print(f"[red]Error reading SSH config: {e}[/red]")
@@ -102,14 +103,15 @@ def parse_ssh_config(host_alias: str) -> Optional[dict]:
             'hostname': host_config.get('hostname'),
             'port': int(host_config.get('port', 22)),
             'user': host_config.get('user'),
-            'identityfile': host_config.get('identityfile', [None])[0]
+            'identityfile': host_config.get('identityfile', [None])[0],
+            'proxyjump': host_config.get('proxyjump')
         }
     except Exception as e:
         console.print(f"[red]Error parsing SSH config: {e}[/red]")
         return None
 
 
-def add_host_to_config(alias: str, hostname: str, user: str, port: int = 22, identity_file: Optional[str] = None) -> bool:
+def add_host_to_config(alias: str, hostname: str, user: str, port: int = 22, identity_file: Optional[str] = None, jump_host: Optional[str] = None) -> bool:
     """
     Add a new host to SSH config.
     
@@ -119,6 +121,7 @@ def add_host_to_config(alias: str, hostname: str, user: str, port: int = 22, ide
         user: SSH username
         port: SSH port (default 22)
         identity_file: Path to private key file (optional)
+        jump_host: Jump host/bastion alias (optional)
         
     Returns:
         True if successful, False otherwise
@@ -140,11 +143,16 @@ def add_host_to_config(alias: str, hostname: str, user: str, port: int = 22, ide
     if identity_file:
         config_entry += f"    IdentityFile {identity_file}\n"
     
+    if jump_host:
+        config_entry += f"    ProxyJump {jump_host}\n"
+    
     # Append to config
     try:
         with open(ssh_config_path, 'a') as f:
             f.write(config_entry)
         console.print(f"[green]✓ Successfully added server '{alias}'[/green]")
+        if jump_host:
+            console.print(f"[dim]  Using jump host: {jump_host}[/dim]")
         return True
     except Exception as e:
         console.print(f"[red]Error writing to SSH config: {e}[/red]")

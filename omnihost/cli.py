@@ -21,6 +21,9 @@ from omnihost.commands.config_command import register_config_command
 from omnihost.commands.group_management import register_group_commands
 from omnihost.commands.alias_management import register_alias_commands
 from omnihost.commands.file_transfer import register_file_transfer_commands
+from omnihost.commands.history_command import app as history_app
+from omnihost.commands.tunnel_command import app as tunnel_app
+from omnihost.commands.profiling_command import app as profile_app
 
 console = Console()
 
@@ -149,6 +152,9 @@ register_config_command(app)
 register_group_commands(app)
 register_alias_commands(app)
 register_file_transfer_commands(app)
+app.add_typer(history_app)
+app.add_typer(tunnel_app)
+app.add_typer(profile_app)
 
 
 def main():

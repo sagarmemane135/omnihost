@@ -79,12 +79,12 @@ def group_show(
         console.print(f"[red]✗[/red] Group '[cyan]{group_name}[/cyan]' not found")
         raise typer.Exit(1)
     
+    table = Table(title=f"Group: {group_name}", show_header=True)
     table.add_column("Server", style="cyan")
     table.add_column("Tags", style="yellow")
     
     all_servers_list = get_all_hosts()
     all_servers = {s['alias']: s for s in all_servers_list}
-    for server in servers:vers()
     for server in servers:
         tags = config.get_server_tags(server)
         server_info = all_servers.get(server, {})

@@ -4,9 +4,7 @@ Handles interactive SSH shell sessions with PTY support.
 """
 
 import sys
-import select
-import termios
-import tty
+import platform
 
 import typer
 from rich.console import Console
@@ -17,6 +15,15 @@ from omnihost.ssh_config import parse_ssh_config
 from omnihost.ssh_client import create_ssh_client
 
 console = Console()
+
+# Platform-specific imports
+if platform.system() == 'Windows':
+    import msvcrt
+    import threading
+else:
+    import select
+    import termios
+    import tty
 
 
 def register_connect_command(app: typer.Typer):
@@ -60,39 +67,74 @@ def connect(
         channel = client.invoke_shell()
         channel.settimeout(0.0)
         
-        # Set terminal to raw mode
-        oldtty = termios.tcgetattr(sys.stdin)
-        try:
-            tty.setraw(sys.stdin.fileno())
-            tty.setcbreak(sys.stdin.fileno())
-            channel.settimeout(0.0)
-            
-            while True:
-                # Check if channel is still open
-                if channel.exit_status_ready():
-                    break
-                
-                # Use select to handle I/O
-                r, w, e = select.select([channel, sys.stdin], [], [], 0.1)
-                
-                if channel in r:
-                    try:
-                        data = channel.recv(1024)
-                        if len(data) == 0:
+        if platform.system() == 'Windows':
+            # Windows implementation
+            def read_stdin():
+                while True:
+                    if msvcrt.kbhit():
+                        char = msvcrt.getch()
+                        if char == b'\x03':  # Ctrl+C
                             break
-                        sys.stdout.buffer.write(data)
-                        sys.stdout.flush()
+                        channel.send(char)
+            
+            def read_channel():
+                while True:
+                    try:
+                        if channel.recv_ready():
+                            data = channel.recv(1024)
+                            if len(data) == 0:
+                                break
+                            sys.stdout.buffer.write(data)
+                            sys.stdout.flush()
+                        if channel.exit_status_ready():
+                            break
                     except Exception:
                         break
+            
+            # Start threads for reading
+            stdin_thread = threading.Thread(target=read_stdin, daemon=True)
+            channel_thread = threading.Thread(target=read_channel, daemon=True)
+            
+            stdin_thread.start()
+            channel_thread.start()
+            
+            # Wait for channel to close
+            channel_thread.join()
+            stdin_thread.join()
+        else:
+            # Unix/Linux implementation
+            oldtty = termios.tcgetattr(sys.stdin)
+            try:
+                tty.setraw(sys.stdin.fileno())
+                tty.setcbreak(sys.stdin.fileno())
+                channel.settimeout(0.0)
                 
-                if sys.stdin in r:
-                    data = sys.stdin.read(1)
-                    if len(data) == 0:
+                while True:
+                    # Check if channel is still open
+                    if channel.exit_status_ready():
                         break
-                    channel.send(data)
                     
-        finally:
-            termios.tcsetattr(sys.stdin, termios.TCSADRAIN, oldtty)
+                    # Use select to handle I/O
+                    r, w, e = select.select([channel, sys.stdin], [], [], 0.1)
+                    
+                    if channel in r:
+                        try:
+                            data = channel.recv(1024)
+                            if len(data) == 0:
+                                break
+                            sys.stdout.buffer.write(data)
+                            sys.stdout.flush()
+                        except Exception:
+                            break
+                    
+                    if sys.stdin in r:
+                        data = sys.stdin.read(1)
+                        if len(data) == 0:
+                            break
+                        channel.send(data)
+                        
+            finally:
+                termios.tcsetattr(sys.stdin, termios.TCSADRAIN, oldtty)
         
         console.print()
         console.print(Panel(

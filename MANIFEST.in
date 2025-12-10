@@ -11,6 +11,12 @@ include pyproject.toml
 # Include documentation
 recursive-include docs *.md
 
+# Include man pages
+recursive-include man *.1
+
+# Include scripts
+recursive-include scripts *.py
+
 # Include GitHub templates
 recursive-include .github *.md *.yml
 

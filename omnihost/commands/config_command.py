@@ -12,8 +12,10 @@ from rich import box
 from omnihost.config import (
     get_default_server, set_default_server,
     get_server_alias, set_server_alias,
-    load_config, save_config
+    load_config, save_config,
+    validate_config, export_config, import_config
 )
+from omnihost.exit_codes import ExitCode
 from omnihost.ssh_config import host_exists
 
 console = Console()
@@ -27,6 +29,9 @@ def register_config_command(app: typer.Typer):
     config_app.command(name="set-default")(set_default)
     config_app.command(name="alias")(add_alias)
     config_app.command(name="list-aliases")(list_aliases)
+    config_app.command(name="validate")(validate)
+    config_app.command(name="export")(export)
+    config_app.command(name="import")(import_cmd)
     
     app.add_typer(config_app)
 
@@ -138,3 +143,80 @@ def list_aliases():
         table.add_row(alias, "→", server)
     
     console.print(table)
+
+
+def validate():
+    """Validate configuration file."""
+    is_valid, errors = validate_config()
+    
+    if is_valid:
+        console.print(Panel(
+            "[green]✓ Configuration is valid[/green]",
+            title="✓ Validation Success",
+            border_style="green",
+            box=box.ROUNDED
+        ))
+    else:
+        error_text = "\n".join(f"  • {error}" for error in errors)
+        console.print(Panel(
+            f"[red]Configuration validation failed:[/red]\n\n{error_text}",
+            title="❌ Validation Errors",
+            border_style="red",
+            box=box.ROUNDED
+        ))
+        raise typer.Exit(code=ExitCode.CONFIG_ERROR)
+
+
+def export(
+    output_file: str = typer.Option(None, "--output", "-o", help="Output file path (default: auto-generated)")
+):
+    """Export configuration to a JSON file."""
+    try:
+        exported_path = export_config(output_file)
+        console.print(Panel(
+            f"[green]✓[/green] Configuration exported to:\n[cyan]{exported_path}[/cyan]",
+            title="✓ Export Success",
+            border_style="green",
+            box=box.ROUNDED
+        ))
+    except Exception as e:
+        console.print(Panel(
+            f"[red]Export failed:[/red] {str(e)}",
+            title="❌ Export Error",
+            border_style="red",
+            box=box.ROUNDED
+        ))
+        raise typer.Exit(code=ExitCode.CONFIG_FILE_ERROR)
+
+
+def import_cmd(
+    input_file: str = typer.Argument(..., help="Path to JSON config file to import"),
+    merge: bool = typer.Option(False, "--merge", "-m", help="Merge with existing config instead of replacing")
+):
+    """Import configuration from a JSON file."""
+    try:
+        success = import_config(input_file, merge=merge)
+        if success:
+            mode = "merged with" if merge else "replaced by"
+            console.print(Panel(
+                f"[green]✓[/green] Configuration {mode} imported file:\n[cyan]{input_file}[/cyan]",
+                title="✓ Import Success",
+                border_style="green",
+                box=box.ROUNDED
+            ))
+        else:
+            console.print(Panel(
+                f"[red]Import failed:[/red] File not found or invalid JSON\n[cyan]{input_file}[/cyan]",
+                title="❌ Import Error",
+                border_style="red",
+                box=box.ROUNDED
+            ))
+            raise typer.Exit(code=ExitCode.CONFIG_FILE_ERROR)
+    except Exception as e:
+        console.print(Panel(
+            f"[red]Import failed:[/red] {str(e)}",
+            title="❌ Import Error",
+            border_style="red",
+            box=box.ROUNDED
+        ))
+        raise typer.Exit(code=ExitCode.CONFIG_FILE_ERROR)

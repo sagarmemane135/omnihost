@@ -1,14 +1,19 @@
 """
 OmniHost Configuration Module
 Handles user preferences like default server, output mode, etc.
+Supports environment variables for configuration.
 """
 
 import json
+import os
 from pathlib import Path
 from typing import Optional, Dict
 
 CONFIG_DIR = Path.home() / ".omnihost"
 CONFIG_FILE = CONFIG_DIR / "config.json"
+
+# Environment variable prefixes
+ENV_PREFIX = "OMNIHOST_"
 
 
 def ensure_config_dir():
@@ -18,36 +23,63 @@ def ensure_config_dir():
 
 
 def load_config() -> Dict:
-    """Load configuration from file."""
+    """Load configuration from file and environment variables."""
     ensure_config_dir()
     
-    if not CONFIG_FILE.exists():
-        return {
-            "default_server": None,
-            "output_mode": "normal",  # normal, compact, silent
-            "parallel_connections": 5,
-            "timeout": 30,
-            "groups": {},  # group_name: [server1, server2, ...]
-            "server_tags": {},  # server_name: [tag1, tag2, ...]
-            "command_aliases": {},  # alias_name: command_string
-            "audit_enabled": True
-        }
+    # Default configuration
+    default_config = {
+        "default_server": None,
+        "output_mode": "normal",  # normal, compact, silent
+        "parallel_connections": 5,
+        "timeout": 30,
+        "groups": {},  # group_name: [server1, server2, ...]
+        "server_tags": {},  # server_name: [tag1, tag2, ...]
+        "command_aliases": {},  # alias_name: command_string
+        "audit_enabled": True
+    }
     
-    try:
-        with open(CONFIG_FILE, 'r') as f:
-            config = json.load(f)
-            # Ensure new keys exist for backward compatibility
-            if "groups" not in config:
-                config["groups"] = {}
-            if "server_tags" not in config:
-                config["server_tags"] = {}
-            if "command_aliases" not in config:
-                config["command_aliases"] = {}
-            if "audit_enabled" not in config:
-                config["audit_enabled"] = True
-            return config
-    except Exception:
-        return {}
+    # Load from file
+    if CONFIG_FILE.exists():
+        try:
+            with open(CONFIG_FILE, 'r') as f:
+                config = json.load(f)
+                # Merge with defaults
+                for key, value in default_config.items():
+                    if key not in config:
+                        config[key] = value
+        except Exception:
+            config = default_config.copy()
+    else:
+        config = default_config.copy()
+    
+    # Override with environment variables (env vars take precedence)
+    env_default_server = os.getenv(f"{ENV_PREFIX}DEFAULT_SERVER")
+    if env_default_server:
+        config["default_server"] = env_default_server
+    
+    env_output_mode = os.getenv(f"{ENV_PREFIX}OUTPUT_MODE")
+    if env_output_mode:
+        config["output_mode"] = env_output_mode
+    
+    env_parallel = os.getenv(f"{ENV_PREFIX}PARALLEL")
+    if env_parallel:
+        try:
+            config["parallel_connections"] = int(env_parallel)
+        except ValueError:
+            pass
+    
+    env_timeout = os.getenv(f"{ENV_PREFIX}TIMEOUT")
+    if env_timeout:
+        try:
+            config["timeout"] = int(env_timeout)
+        except ValueError:
+            pass
+    
+    env_audit = os.getenv(f"{ENV_PREFIX}AUDIT_ENABLED")
+    if env_audit:
+        config["audit_enabled"] = env_audit.lower() in ("true", "1", "yes", "on")
+    
+    return config
 
 
 def save_config(config: Dict):
@@ -234,3 +266,234 @@ def remove_command_alias(alias: str):
     if "command_aliases" in config and alias in config["command_aliases"]:
         del config["command_aliases"][alias]
         save_config(config)
+
+
+# ========== Config Validation & Management ==========
+
+def validate_config() -> tuple[bool, list[str]]:
+    """
+    Validate configuration file.
+    
+    Returns:
+        tuple: (is_valid, list_of_errors)
+    """
+    errors = []
+    
+    try:
+        config = load_config()
+        
+        # Validate output_mode
+        valid_modes = ["normal", "compact", "silent"]
+        if config.get("output_mode") not in valid_modes:
+            errors.append(f"Invalid output_mode: {config.get('output_mode')}. Must be one of {valid_modes}")
+        
+        # Validate parallel_connections
+        parallel = config.get("parallel_connections", 5)
+        if not isinstance(parallel, int) or parallel < 1 or parallel > 50:
+            errors.append(f"Invalid parallel_connections: {parallel}. Must be between 1 and 50")
+        
+        # Validate timeout
+        timeout = config.get("timeout", 30)
+        if not isinstance(timeout, int) or timeout < 1:
+            errors.append(f"Invalid timeout: {timeout}. Must be a positive integer")
+        
+        # Validate default_server exists (if set)
+        default_server = config.get("default_server")
+        if default_server:
+            from omnihost.ssh_config import host_exists
+            if not host_exists(default_server):
+                errors.append(f"Default server '{default_server}' not found in SSH config")
+        
+        # Validate groups reference existing servers
+        from omnihost.ssh_config import get_all_hosts
+        all_hosts = {h['alias'] for h in get_all_hosts()}
+        groups = config.get("groups", {})
+        for group_name, servers in groups.items():
+            if not isinstance(servers, list):
+                errors.append(f"Group '{group_name}' has invalid format (not a list)")
+                continue
+            for server in servers:
+                if server not in all_hosts:
+                    errors.append(f"Group '{group_name}' references non-existent server: {server}")
+        
+    except Exception as e:
+        errors.append(f"Error loading config: {str(e)}")
+    
+    return len(errors) == 0, errors
+
+
+def export_config(output_file: Optional[str] = None) -> str:
+    """
+    Export configuration to a JSON file.
+    
+    Args:
+        output_file: Path to output file (default: config_backup_<timestamp>.json)
+    
+    Returns:
+        str: Path to exported file
+    """
+    from datetime import datetime
+    
+    config = load_config()
+    
+    if not output_file:
+        timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+        output_file = str(CONFIG_DIR / f"config_backup_{timestamp}.json")
+    
+    output_path = Path(output_file)
+    output_path.parent.mkdir(parents=True, exist_ok=True)
+    
+    with open(output_path, 'w') as f:
+        json.dump(config, f, indent=2)
+    
+    return str(output_path)
+
+
+def import_config(input_file: str, merge: bool = False) -> bool:
+    """
+    Import configuration from a JSON file.
+    
+    Args:
+        input_file: Path to input JSON file
+        merge: If True, merge with existing config. If False, replace.
+    
+    Returns:
+        bool: True if successful, False otherwise
+    """
+    input_path = Path(input_file)
+    
+    if not input_path.exists():
+        return False
+    
+    try:
+        with open(input_path, 'r') as f:
+            imported_config = json.load(f)
+        
+        if merge:
+            # Merge with existing config
+            existing_config = load_config()
+            existing_config.update(imported_config)
+            save_config(existing_config)
+        else:
+            # Replace config
+            save_config(imported_config)
+        
+        return True
+    except Exception:
+        return False
+
+
+# ========== Config Validation & Management ==========
+
+def validate_config() -> tuple[bool, list[str]]:
+    """
+    Validate configuration file.
+    
+    Returns:
+        tuple: (is_valid, list_of_errors)
+    """
+    errors = []
+    
+    try:
+        config = load_config()
+        
+        # Validate output_mode
+        valid_modes = ["normal", "compact", "silent"]
+        if config.get("output_mode") not in valid_modes:
+            errors.append(f"Invalid output_mode: {config.get('output_mode')}. Must be one of {valid_modes}")
+        
+        # Validate parallel_connections
+        parallel = config.get("parallel_connections", 5)
+        if not isinstance(parallel, int) or parallel < 1 or parallel > 50:
+            errors.append(f"Invalid parallel_connections: {parallel}. Must be between 1 and 50")
+        
+        # Validate timeout
+        timeout = config.get("timeout", 30)
+        if not isinstance(timeout, int) or timeout < 1:
+            errors.append(f"Invalid timeout: {timeout}. Must be a positive integer")
+        
+        # Validate default_server exists (if set)
+        default_server = config.get("default_server")
+        if default_server:
+            from omnihost.ssh_config import host_exists
+            if not host_exists(default_server):
+                errors.append(f"Default server '{default_server}' not found in SSH config")
+        
+        # Validate groups reference existing servers
+        from omnihost.ssh_config import get_all_hosts
+        all_hosts = {h['alias'] for h in get_all_hosts()}
+        groups = config.get("groups", {})
+        for group_name, servers in groups.items():
+            if not isinstance(servers, list):
+                errors.append(f"Group '{group_name}' has invalid format (not a list)")
+                continue
+            for server in servers:
+                if server not in all_hosts:
+                    errors.append(f"Group '{group_name}' references non-existent server: {server}")
+        
+    except Exception as e:
+        errors.append(f"Error loading config: {str(e)}")
+    
+    return len(errors) == 0, errors
+
+
+def export_config(output_file: Optional[str] = None) -> str:
+    """
+    Export configuration to a JSON file.
+    
+    Args:
+        output_file: Path to output file (default: config_backup_<timestamp>.json)
+    
+    Returns:
+        str: Path to exported file
+    """
+    import time
+    from datetime import datetime
+    
+    config = load_config()
+    
+    if not output_file:
+        timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+        output_file = str(CONFIG_DIR / f"config_backup_{timestamp}.json")
+    
+    output_path = Path(output_file)
+    output_path.parent.mkdir(parents=True, exist_ok=True)
+    
+    with open(output_path, 'w') as f:
+        json.dump(config, f, indent=2)
+    
+    return str(output_path)
+
+
+def import_config(input_file: str, merge: bool = False) -> bool:
+    """
+    Import configuration from a JSON file.
+    
+    Args:
+        input_file: Path to input JSON file
+        merge: If True, merge with existing config. If False, replace.
+    
+    Returns:
+        bool: True if successful, False otherwise
+    """
+    input_path = Path(input_file)
+    
+    if not input_path.exists():
+        return False
+    
+    try:
+        with open(input_path, 'r') as f:
+            imported_config = json.load(f)
+        
+        if merge:
+            # Merge with existing config
+            existing_config = load_config()
+            existing_config.update(imported_config)
+            save_config(existing_config)
+        else:
+            # Replace config
+            save_config(imported_config)
+        
+        return True
+    except Exception:
+        return False

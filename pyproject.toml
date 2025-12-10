@@ -58,3 +58,14 @@ omnihost = "omnihost.cli:main"
 where = ["."]
 include = ["omnihost*"]
 exclude = ["tests*", "venv*"]
+
+[tool.setuptools.package-data]
+omnihost = ["../man/**/*.1"]
+
+# Include man pages and scripts in distribution
+[tool.setuptools]
+include-package-data = true
+
+# Data files to include (man pages)
+# Note: setuptools doesn't directly support installing man pages to system directories
+# Users will need to run: python -m omnihost.install_man_pages (or use setup_man_pages.py)

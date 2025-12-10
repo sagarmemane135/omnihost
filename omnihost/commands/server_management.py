@@ -80,7 +80,8 @@ def add_server(
     hostname: str = typer.Option(None, "--hostname", "-h", help="Server hostname or IP"),
     user: str = typer.Option(None, "--user", "-u", help="SSH username"),
     port: int = typer.Option(22, "--port", "-p", help="SSH port"),
-    identity_file: str = typer.Option(None, "--key", "-k", help="Path to SSH private key")
+    identity_file: str = typer.Option(None, "--key", "-k", help="Path to SSH private key"),
+    jump_host: str = typer.Option(None, "--jump-host", "-j", help="Jump host/bastion alias")
 ):
     """
     Add a new server to SSH config.
@@ -121,6 +122,11 @@ def add_server(
             default_key = "~/.ssh/id_rsa"
             identity_file = Prompt.ask("[cyan]Path to private key[/cyan]", default=default_key)
     
+    if not jump_host:
+        use_jump = Confirm.ask("[cyan]Use jump host/bastion?[/cyan]", default=False)
+        if use_jump:
+            jump_host = Prompt.ask("[cyan]Jump host alias[/cyan]")
+    
     # Show summary
     console.print("\n[bold]Configuration Summary:[/bold]")
     console.print(f"  Alias: [cyan]{alias}[/cyan]")
@@ -129,9 +135,11 @@ def add_server(
     console.print(f"  Port: [blue]{port}[/blue]")
     if identity_file:
         console.print(f"  Identity File: [magenta]{identity_file}[/magenta]")
+    if jump_host:
+        console.print(f"  Jump Host: [cyan]{jump_host}[/cyan]")
     
     if Confirm.ask("\n[bold]Add this server?[/bold]", default=True):
-        add_host_to_config(alias, hostname, user, port, identity_file)
+        add_host_to_config(alias, hostname, user, port, identity_file, jump_host)
     else:
         console.print("[yellow]Cancelled[/yellow]")
 

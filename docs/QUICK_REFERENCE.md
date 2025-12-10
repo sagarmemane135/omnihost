@@ -1,4 +1,6 @@
-# 📖 OmniHost Quick Reference
+# 📖 Quick Reference
+
+Command cheat sheet and quick examples for OmniHost.
 
 ## 📦 Installation
 ```bash
@@ -108,6 +110,15 @@ omnihost exec-group web "<cmd>" --retries 3   # With retry
 --help                 # Show help message
 ```
 
+## ⚙️ Environment Variables
+```bash
+export OMNIHOST_DEFAULT_SERVER=web01    # Set default server
+export OMNIHOST_OUTPUT_MODE=compact     # Set output mode
+export OMNIHOST_PARALLEL=10             # Set default parallelism
+export OMNIHOST_TIMEOUT=60              # Set default timeout
+export OMNIHOST_AUDIT_ENABLED=true      # Enable/disable audit logging
+```
+
 ## 🎛️ Common Command Options
 ```bash
 -p, --parallel N       # Parallel connections (default: 5, range: 1-20)
@@ -117,6 +128,16 @@ omnihost exec-group web "<cmd>" --retries 3   # With retry
 --plain                # Plain output without Rich formatting
 -n, --lines N          # Number of log lines (for logs command)
 -f, --follow           # Follow logs in real-time
+```
+
+## ⚙️ Configuration Management
+```bash
+omnihost config show                   # Show current configuration
+omnihost config validate               # Validate configuration
+omnihost config export                 # Export config (backup)
+omnihost config export -o backup.json  # Export to specific file
+omnihost config import backup.json     # Import config (replace)
+omnihost config import backup.json --merge  # Import config (merge)
 ```
 
 ## 🔍 Audit & Compliance
@@ -198,53 +219,6 @@ omnihost processes prod01
 # Check last logins
 omnihost exec db01 "last -n 20"
 ```
-
-## 🏗️ Project Structure
-```
-omnihost/
-├── __init__.py                # Package metadata
-├── cli.py                     # CLI entry point
-├── ssh_config.py              # SSH config CRUD (224 lines)
-├── ssh_client.py              # Connection management (52 lines)
-├── utils.py                   # Shared utilities
-├── performance.py             # Caching & optimizations
-└── commands/
-    ├── server_management.py   # list, add, edit, remove, info
-    ├── exec_command.py        # Remote execution
-    ├── connect_command.py     # Interactive shell
-    ├── bulk_operations.py     # exec-all, exec-multi
-    └── quick_commands.py      # uptime, disk, memory, etc.
-```
-
-## 🔧 Development
-
-### Add New Command
-1. Create function in appropriate module under `omnihost/commands/`
-2. Register in `omnihost/cli.py`
-3. Reinstall: `pip install -e .`
-
-### Test Commands
-```bash
-omnihost --help                        # List all commands
-omnihost list                          # Test server listing
-omnihost exec <host> "echo test"       # Test execution
-```
-
-## 📚 Documentation
-- **README.md** - Getting started & features
-- **PERFORMANCE.md** - Performance guide & DevOps patterns
-- **ARCHITECTURE.md** - Developer guide
-- **QUICK_REFERENCE.md** - This file
-
-## 🎨 Features
-✅ 17 commands (server mgmt, execution, bulk ops, quick commands)
-✅ Parallel execution with ThreadPoolExecutor
-✅ Beautiful CLI with Rich library (tables, progress bars, panels)
-✅ Interactive prompts & PTY shells
-✅ SSH config management (~/.ssh/config)
-✅ Caching infrastructure for performance
-✅ Comprehensive error handling
-✅ Modular & scalable architecture
 
 ## 💡 Pro Tips
 1. Use **quick commands** for daily checks (faster to type)

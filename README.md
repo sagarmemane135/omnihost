@@ -56,6 +56,23 @@ omnihost --debug exec-all "uptime"
 
 # Audit logging - all commands tracked automatically
 cat ~/.omnihost/audit.log  # JSON audit trail
+
+# Command History - track and replay commands
+omnihost history                    # List recent commands
+omnihost history show 42            # Show command details
+omnihost history replay 42          # Replay a command
+
+# SSH Tunnels - port forwarding made easy
+omnihost tunnel create web01 8080 --remote-port 80
+omnihost tunnel list                 # List active tunnels
+omnihost tunnel stop web01 8080     # Stop a tunnel
+
+# Jump Hosts - access private servers through bastions
+omnihost add private-server -h 10.0.0.5 --jump-host bastion
+
+# Performance Profiling - optimize your operations
+omnihost profile list                # List profile files
+omnihost profile show profile.prof   # Analyze performance
 ```
 
 ## 🎯 Why OmniHost?
@@ -94,8 +111,33 @@ cat ~/.omnihost/audit.log  # JSON audit trail
 - No password storage
 - Respects SSH config security settings
 - Connection timeout management
+- **Audit logging** - All commands tracked automatically
+
+### ⚙️ Configuration Management
+- **Environment variables** - Configure via `OMNIHOST_*` env vars
+- **Config validation** - `omnihost config validate`
+- **Config export/import** - Backup and restore configurations
+- **Default server** - Set once, use everywhere
+- **Server groups** - Organize servers logically
+- **Command aliases** - Reusable command shortcuts
 
 ## 📦 Installation
+
+### From PyPI (Recommended)
+```bash
+pip install omnihost
+```
+
+**Note:** After installation, you may want to install man pages:
+```bash
+# Linux/Mac (requires sudo for system-wide)
+sudo python -m omnihost.install_man_pages
+
+# Or user-specific (no sudo needed)
+python -m omnihost.install_man_pages
+```
+
+Then you can use: `man omnihost`
 
 ### From Source
 
@@ -144,6 +186,9 @@ omnihost list -v        # Verbose with SSH keys
 ```bash
 omnihost config set-default web01
 # Now you can use: omnihost uptime (without specifying server)
+
+# Or use environment variable:
+export OMNIHOST_DEFAULT_SERVER=web01
 ```
 
 ### 4. Execute Commands
@@ -177,11 +222,45 @@ omnihost connect web01
 # Full PTY support - run vim, htop, top, etc.
 ```
 
+## ⚙️ Configuration
+
+### Environment Variables
+
+OmniHost supports configuration via environment variables (takes precedence over config file):
+
+```bash
+export OMNIHOST_DEFAULT_SERVER=web01
+export OMNIHOST_OUTPUT_MODE=compact
+export OMNIHOST_PARALLEL=10
+export OMNIHOST_TIMEOUT=60
+export OMNIHOST_AUDIT_ENABLED=true
+```
+
+### Config Management
+
+```bash
+# Show current configuration
+omnihost config show
+
+# Validate configuration
+omnihost config validate
+
+# Export configuration (backup)
+omnihost config export
+omnihost config export --output my-config.json
+
+# Import configuration (restore)
+omnihost config import my-config.json
+omnihost config import my-config.json --merge  # Merge with existing
+```
+
 ## 📖 Documentation
 
 - **[Quick Reference](docs/QUICK_REFERENCE.md)** - Command cheat sheet
-- **[Performance Guide](docs/PERFORMANCE.md)** - DevOps patterns and optimization
-- **[Architecture](docs/ARCHITECTURE.md)** - Code structure and design
+- **[Performance Guide](docs/PERFORMANCE.md)** - Optimization tips
+- **[Architecture](docs/ARCHITECTURE.md)** - Code structure
+- **[CLI Best Practices](docs/CLI_BEST_PRACTICES_ANALYSIS.md)** - Best practices
+- **[Feature Roadmap](docs/FEATURE_ROADMAP.md)** - Planned features
 - **[Contributing](CONTRIBUTING.md)** - Development guide
 - **[Security](SECURITY.md)** - Security policy
 - **[Changelog](CHANGELOG.md)** - Version history
@@ -237,16 +316,9 @@ omnihost/
     └── config_command.py    # Configuration management
 ```
 
-## 🤝 Contributing
-- 📋 **Beautiful table formatting** for server lists
-- ℹ️ **Server information** - View details and test connections
-- 🔧 **SSH config integration** - Works with `~/.ssh/config`
-- 🎨 **Rich formatting** - Color-coded output and panels
-- 💾 **Persistent storage** - All config saved to SSH config file
-- 🔐 **SSH key support** - Use identity files for authentication
-
 ## 📚 Commands Reference
 
+### Server Management
 | Command | Description | Example |
 |---------|-------------|---------|
 | `list` | Show all configured servers | `omnihost list -v` |
@@ -254,64 +326,31 @@ omnihost/
 | `info` | Show server details | `omnihost info myserver` |
 | `edit` | Edit server configuration | `omnihost edit myserver` |
 | `remove` | Remove a server | `omnihost remove myserver` |
+
+### Execution
+| Command | Description | Example |
+|---------|-------------|---------|
 | `exec` | Execute command on server | `omnihost exec myserver "ls -la"` |
 | `connect` | Open interactive shell | `omnihost connect myserver` |
+| `exec-all` | Execute on all servers | `omnihost exec-all "uptime" --parallel 10` |
+| `exec-multi` | Execute on specific servers | `omnihost exec-multi "web01,web02" "df -h"` |
+| `exec-group` | Execute on server group | `omnihost exec-group web "systemctl restart nginx"` |
 
-## 📂 Project Structure
+### Configuration
+| Command | Description | Example |
+|---------|-------------|---------|
+| `config show` | Show configuration | `omnihost config show` |
+| `config set-default` | Set default server | `omnihost config set-default web01` |
+| `config validate` | Validate configuration | `omnihost config validate` |
+| `config export` | Export configuration | `omnihost config export` |
+| `config import` | Import configuration | `omnihost config import backup.json` |
 
-```
-ServerManager/
-├── omnihost/                      # Main package
-│   ├── __init__.py               # Package metadata
-│   ├── cli.py                     # CLI entry point
-│   ├── ssh_config.py              # SSH config operations
-│   ├── ssh_client.py              # Connection management
-│   ├── utils.py                   # Shared utilities
-│   └── commands/                  # Command modules
-│       ├── __init__.py
-│       ├── server_management.py   # list, add, edit, remove, info
-│       ├── exec_command.py        # Remote command execution
-│       └── connect_command.py     # Interactive shell
-├── pyproject.toml                 # Package configuration
-├── requirements.txt               # Dependencies
-├── main.py                        # Legacy wrapper
-├── README.md                      # This file
-├── ARCHITECTURE.md                # Developer guide
-└── QUICK_REFERENCE.md             # Quick reference
-```
+### Groups & Aliases
+| Command | Description | Example |
+|---------|-------------|---------|
+| `group add` | Create server group | `omnihost group add web web01 web02` |
+| `alias add` | Create command alias | `omnihost alias add restart-nginx "sudo systemctl restart nginx"` |
 
-## 🔧 Development
-
-### Install in Development Mode
-```bash
-pip install -e .
-```
-
-Changes to the code are immediately reflected without reinstalling.
-
-### Run Tests
-```bash
-# Syntax check
-python -m py_compile omnihost/*.py omnihost/commands/*.py
-
-# Test commands
-omnihost --help
-omnihost list
-```
-
-### Add New Commands
-
-1. Create `omnihost/commands/my_command.py`
-2. Import in `omnihost/cli.py`
-3. Register with `register_my_command(app)`
-
-See ARCHITECTURE.md for details.
-
-## 🛠️ Requirements
-
-- Python 3.8 or higher
-- Unix-like system (Linux, macOS, WSL on Windows)
-- SSH config file at `~/.ssh/config`
 
 ## 📝 SSH Config
 
@@ -332,84 +371,18 @@ Host production
 
 OmniHost can create and manage this file for you!
 
-## 🎨 Example Sessions
-
-### Adding a Server
-```bash
-$ omnihost add
-╭─────────────────╮
-│ Add New Server  │
-╰─────────────────╯
-Server alias: web01
-Hostname or IP address: 192.168.1.100
-SSH username: ubuntu
-SSH port [22]: 
-Use SSH key file? [Y/n]: y
-Path to private key [~/.ssh/id_rsa]: 
-
-Configuration Summary:
-  Alias: web01
-  Hostname: 192.168.1.100
-  User: ubuntu
-  Port: 22
-  Identity File: ~/.ssh/id_rsa
-
-Add this server? [Y/n]: y
-✓ Successfully added server 'web01'
-```
-
-### Listing Servers
-```bash
-$ omnihost list
-
-            Configured Servers             
-╭────────┬─────────────┬───────────┬──────╮
-│ Alias  │ Hostname    │ User      │ Port │
-├────────┼─────────────┼───────────┼──────┤
-│ web01  │ 192.168.1.100│ ubuntu   │  22  │
-│ db01   │ 10.0.0.5    │ postgres  │  22  │
-╰────────┴─────────────┴───────────┴──────╯
-
-Total servers: 2
-```
-
-### Executing Commands
-```bash
-$ omnihost exec web01 "df -h | head -5"
-
-╭────────────────────── 🔌 Connecting ───────────────────────╮
-│ Host: web01                                                 │
-│ Server: ubuntu@192.168.1.100:22                            │
-│ Command: df -h | head -5                                    │
-╰─────────────────────────────────────────────────────────────╯
-
-╭───────────────────── ✓ Output ─────────────────────────╮
-│ Filesystem      Size  Used Avail Use% Mounted on       │
-│ /dev/sda1        50G   20G   28G  42% /                │
-│ tmpfs            16G     0   16G   0% /dev/shm          │
-│ /dev/sdb1       100G   45G   51G  47% /data            │
-╰─────────────────────────────────────────────────────────╯
-```
-
 ## 🤝 Contributing
 
-We love contributions! Here's how you can help:
+We welcome contributions! See [CONTRIBUTING.md](CONTRIBUTING.md) for guidelines.
 
-1. **Star this repo** ⭐
-2. **Report bugs** via GitHub Issues
-3. **Suggest features** or improvements
-4. **Submit Pull Requests** - see [CONTRIBUTING.md](CONTRIBUTING.md)
-
-### Development Setup
+**Quick start:**
 ```bash
-git clone https://github.com/sagar.memane/omnihost.git
+git clone https://github.com/sagarmemane135/omnihost.git
 cd omnihost
 python3 -m venv venv
-source venv/bin/activate
+source venv/bin/activate  # On Windows: venv\Scripts\activate
 pip install -e .
 ```
-
-See [CONTRIBUTING.md](CONTRIBUTING.md) for detailed guidelines.
 
 ## 📄 License
 
@@ -429,29 +402,34 @@ This project is licensed under the MIT License - see the [LICENSE](LICENSE) file
 
 ## 🗺️ Roadmap
 
+### ✅ Implemented
 - [x] Server management (add, edit, remove, list)
 - [x] Remote command execution
 - [x] Interactive shell sessions
 - [x] Bulk parallel operations
 - [x] Quick DevOps shortcuts
-- [ ] Server grouping and tagging
-- [ ] Command history and replay
+- [x] Server grouping
+- [x] Command aliases
+- [x] File transfer (push/pull)
+- [x] Configuration management
+- [x] Audit logging
+- [x] Dry-run mode
+- [x] JSON output
+- [x] **Command history and replay** ✨ NEW
+- [x] **SSH tunnel management** ✨ NEW
+- [x] **Jump host / bastion support** ✨ NEW
+- [x] **Performance profiling tools** ✨ NEW
+- [x] **Man page generation** ✨ NEW
+- [x] **Test suite structure** ✨ NEW
+
+### 🚧 Planned
 - [ ] Custom command templates
-- [ ] SSH tunnel management
-- [ ] File transfer operations (SCP/SFTP)
-- [ ] Integration with cloud providers (AWS, Azure, GCP)
-- [ ] Web UI for server management
-- [ ] Ansible integration
+- [ ] Real-time log streaming
+- [ ] Output comparison across servers
+- [ ] Cloud provider integration (AWS, Azure, GCP)
+- [ ] Ansible playbook integration
 
-## 📈 Performance Benchmarks
-
-| Operation | Sequential | Parallel (--parallel 5) | Speedup |
-|-----------|------------|------------------------|---------|
-| 10 servers uptime | 30s | 6s | 5x |
-| 20 servers status | 60s | 12s | 5x |
-| 50 servers check | 150s | 30s | 5x |
-
-*Tests conducted on servers with ~300ms average latency*
+See [Feature Roadmap](docs/FEATURE_ROADMAP.md) for detailed information.
 
 ## 🆘 Troubleshooting
 

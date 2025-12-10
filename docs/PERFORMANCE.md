@@ -1,6 +1,6 @@
-# ⚡ Performance & DevOps Features
+# ⚡ Performance Guide
 
-OmniHost now includes high-performance features designed for DevOps engineers.
+Performance optimization tips and DevOps patterns for OmniHost.
 
 ## 🚀 Quick Commands (Single Server)
 
@@ -271,11 +271,3 @@ omnihost exec-all "ps aux | grep suspicious_process"
 4. **Set appropriate timeouts** based on expected command duration
 5. **Use quick commands** for daily operations - they're faster to type
 
-## 🔮 Coming Soon
-
-- [ ] Command history and replay
-- [ ] Custom command templates
-- [ ] Real-time progress streaming
-- [ ] Server grouping and tags
-- [ ] Output comparison across servers
-- [ ] Automated health checks
