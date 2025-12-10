@@ -49,8 +49,8 @@ jobs:
     
     - name: Test CLI installation
       run: |
+        omnihost --version
         omnihost --help
-        omnihost list || true
     
     - name: Security check with bandit
       run: |
