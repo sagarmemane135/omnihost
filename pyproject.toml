@@ -3,7 +3,7 @@ requires = ["setuptools>=45", "wheel", "setuptools_scm>=6.2"]
 build-backend = "setuptools.build_meta"
 
 [project]
-name = "omnihost"
+name = "omnihost688"
 version = "1.0.0"
 description = "A feature-rich SSH server management CLI tool"
 readme = "README.md"
