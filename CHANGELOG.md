@@ -7,6 +7,22 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added - Phase 2: Reliability & Integration
+
+#### Retry Logic with Exponential Backoff
+- `--retries` flag for all bulk operations (exec-all, exec-multi, exec-group)
+- Automatic retry on transient failures (timeouts, connection errors)
+- Exponential backoff between retry attempts
+- Configurable retry count (default: 0, max recommended: 5)
+- Verbose mode shows retry attempts in real-time
+
+#### JSON Output Mode
+- `--json` flag for machine-readable output on all bulk operations
+- Structured JSON with command, hosts, success/failure counts
+- Individual host results with exit codes and output
+- Perfect for CI/CD pipelines and monitoring
+- Compatible with `jq` for advanced filtering
+
 ### Added - Phase 1: High-ROI Features
 
 #### Server Groups & Organization

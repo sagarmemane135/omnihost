@@ -38,8 +38,9 @@ omnihost push web01 ./app.tar /opt/app/
 omnihost pull db01 /var/log/mysql.log ./logs/
 omnihost push web01 ./dist /var/www/ --recursive
 
-# Execute on all servers in parallel - 10x faster than serial execution
-omnihost exec-all "systemctl status nginx" --parallel 10 --dry-run
+# Execute on all servers in parallel - 10x faster, with retry & dry-run
+omnihost exec-all "systemctl status nginx" --parallel 10 --retries 2 --dry-run
+omnihost exec-all "uptime" --json | jq '.succeeded'  # CI/CD integration
 
 # Quick DevOps shortcuts - no need to type full exec commands
 omnihost uptime  # Uses default server

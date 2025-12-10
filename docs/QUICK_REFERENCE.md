@@ -84,16 +84,20 @@ omnihost exec-all "<cmd>" -p 10        # 10 parallel connections
 omnihost exec-all "<cmd>" -t 60        # 60 second timeout
 omnihost exec-all "<cmd>" --no-output  # Summary only (hide outputs)
 omnihost exec-all "<cmd>" --dry-run    # Preview before execution
+omnihost exec-all "<cmd>" --retries 3  # Retry failed commands 3 times
+omnihost exec-all "<cmd>" --json       # JSON output for CI/CD
 
 # Execute on specific servers
 omnihost exec-multi "h1,h2,h3" "<cmd>"     # Comma-separated list
 omnihost exec-multi "web01,web02" "<cmd>" -p 3  # With parallelism
 omnihost exec-multi "h1,h2" "<cmd>" --dry-run  # Preview first
+omnihost exec-multi "h1,h2" "<cmd>" --retries 2 --json  # Retry + JSON
 
 # Execute on server groups
 omnihost exec-group web "systemctl restart nginx"
 omnihost exec-group db "pg_dump mydb" -p 3
 omnihost exec-group prod "uptime" --dry-run  # Always preview on prod!
+omnihost exec-group web "<cmd>" --retries 3   # With retry
 ```
 
 ## 🎛️ Global Options
@@ -147,6 +151,13 @@ omnihost exec-all "uptime"
 
 # Check disk space across infrastructure
 omnihost exec-all "df -h /" -p 10
+
+# Retry transient failures
+omnihost exec-all "curl https://api.example.com/health" --retries 3
+
+# CI/CD Integration - JSON output
+omnihost exec-all "systemctl status app" --json | jq '.succeeded'
+omnihost exec-group prod "uptime" --json > results.json
 
 # Quick health check on production
 omnihost uptime prod01

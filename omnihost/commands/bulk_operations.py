@@ -29,47 +29,58 @@ def register_bulk_commands(app: typer.Typer):
     app.command(name="exec-group")(exec_group)
 
 
-def execute_on_host(host_alias: str, command: str, timeout: int = 30) -> Dict:
+def execute_on_host(host_alias: str, command: str, timeout: int = 30, retries: int = 0, verbose: bool = False) -> Dict:
     """Execute command on a single host and return result."""
-    result = {
-        'host': host_alias,
-        'success': False,
-        'output': '',
-        'error': '',
-        'exit_code': -1
-    }
+    from omnihost.retry import retry_with_backoff
     
-    try:
-        host_config = parse_ssh_config(host_alias)
-        if not host_config:
-            result['error'] = 'Failed to parse SSH config'
-            return result
-        
-        client = create_ssh_client(host_config)
-        if not client:
-            result['error'] = 'Failed to connect'
-            return result
+    def attempt_execution():
+        result = {
+            'host': host_alias,
+            'success': False,
+            'output': '',
+            'error': '',
+            'exit_code': -1
+        }
         
         try:
-            stdin, stdout, stderr = client.exec_command(command, timeout=timeout)
-            result['output'] = stdout.read().decode('utf-8', errors='ignore')
-            result['error'] = stderr.read().decode('utf-8', errors='ignore')
-            result['exit_code'] = stdout.channel.recv_exit_status()
-            result['success'] = result['exit_code'] == 0
-        finally:
-            client.close()
+            host_config = parse_ssh_config(host_alias)
+            if not host_config:
+                result['error'] = 'Failed to parse SSH config'
+                return result
             
-    except Exception as e:
-        result['error'] = str(e)
+            client = create_ssh_client(host_config)
+            if not client:
+                result['error'] = 'Failed to connect'
+                return result
+            
+            try:
+                stdin, stdout, stderr = client.exec_command(command, timeout=timeout)
+                result['output'] = stdout.read().decode('utf-8', errors='ignore')
+                result['error'] = stderr.read().decode('utf-8', errors='ignore')
+                result['exit_code'] = stdout.channel.recv_exit_status()
+                result['success'] = result['exit_code'] == 0
+            finally:
+                client.close()
+                
+        except Exception as e:
+            result['error'] = str(e)
+        
+        return result
     
-    return result
+    # Use retry logic if retries > 0
+    if retries > 0:
+        return retry_with_backoff(attempt_execution, max_retries=retries, verbose=verbose)
+    else:
+        return attempt_execution()
 
 
 def exec_all(
     command: str = typer.Argument(..., help="Command to execute on all servers"),
     parallel: int = typer.Option(5, "--parallel", "-p", help="Number of parallel connections"),
     timeout: int = typer.Option(30, "--timeout", "-t", help="Command timeout in seconds"),
+    retries: int = typer.Option(0, "--retries", "-r", help="Number of retry attempts on failure"),
     dry_run: bool = typer.Option(False, "--dry-run", help="Show what would be executed without running"),
+    json_output: bool = typer.Option(False, "--json", help="Output results as JSON"),
     continue_on_error: bool = typer.Option(True, "--continue/--stop", help="Continue on errors"),
     show_output: bool = typer.Option(True, "--show-output/--no-output", help="Show command output")
 ):
@@ -129,18 +140,11 @@ def exec_all(
     
     results = []
     
-    with Progress(
-        SpinnerColumn(),
-        TextColumn("[progress.description]{task.description}"),
-        BarColumn(),
-        TaskProgressColumn(),
-        console=console
-    ) as progress:
-        task = progress.add_task(f"[cyan]Executing on {len(host_aliases)} servers...", total=len(host_aliases))
-        
+    # JSON output mode - skip progress bars
+    if json_output:
         with ThreadPoolExecutor(max_workers=parallel) as executor:
             future_to_host = {
-                executor.submit(execute_on_host, host, command, timeout): host 
+                executor.submit(execute_on_host, host, command, timeout, retries): host 
                 for host in host_aliases
             }
             
@@ -149,7 +153,6 @@ def exec_all(
                 try:
                     result = future.result()
                     results.append(result)
-                    progress.update(task, advance=1)
                 except Exception as e:
                     results.append({
                         'host': host,
@@ -158,13 +161,67 @@ def exec_all(
                         'error': str(e),
                         'exit_code': -1
                     })
-                    progress.update(task, advance=1)
+    else:
+        with Progress(
+            SpinnerColumn(),
+            TextColumn("[progress.description]{task.description}"),
+            BarColumn(),
+            TaskProgressColumn(),
+            console=console
+        ) as progress:
+            task = progress.add_task(f"[cyan]Executing on {len(host_aliases)} servers...", total=len(host_aliases))
+            
+            with ThreadPoolExecutor(max_workers=parallel) as executor:
+                future_to_host = {
+                    executor.submit(execute_on_host, host, command, timeout, retries): host 
+                    for host in host_aliases
+                }
+                
+                for future in as_completed(future_to_host):
+                    host = future_to_host[future]
+                    try:
+                        result = future.result()
+                        results.append(result)
+                        progress.update(task, advance=1)
+                    except Exception as e:
+                        results.append({
+                            'host': host,
+                            'success': False,
+                            'output': '',
+                            'error': str(e),
+                            'exit_code': -1
+                        })
+                        progress.update(task, advance=1)
     
     # Display results
-    console.print()
-    
     success_count = sum(1 for r in results if r['success'])
     failed_count = len(results) - success_count
+    
+    # JSON output mode
+    if json_output:
+        import json
+        output_data = {
+            "command": command,
+            "total": len(results),
+            "succeeded": success_count,
+            "failed": failed_count,
+            "results": [
+                {
+                    "host": r['host'],
+                    "success": r['success'],
+                    "exit_code": r['exit_code'],
+                    "output": r['output'],
+                    "error": r['error']
+                }
+                for r in results
+            ]
+        }
+        console.print(json.dumps(output_data, indent=2))
+        if failed_count > 0:
+            raise typer.Exit(code=1)
+        return
+    
+    console.print()
     
     # Summary table
     table = Table(title="Execution Summary", box=box.ROUNDED)
@@ -224,7 +281,9 @@ def exec_multi(
     command: str = typer.Argument(..., help="Command to execute"),
     parallel: int = typer.Option(5, "--parallel", "-p", help="Number of parallel connections"),
     timeout: int = typer.Option(30, "--timeout", "-t", help="Command timeout in seconds"),
-    dry_run: bool = typer.Option(False, "--dry-run", help="Show what would be executed without running")
+    retries: int = typer.Option(0, "--retries", "-r", help="Number of retry attempts on failure"),
+    dry_run: bool = typer.Option(False, "--dry-run", help="Show what would be executed without running"),
+    json_output: bool = typer.Option(False, "--json", help="Output results as JSON")
 ):
     """
     Execute a command on specific servers (comma-separated list).
@@ -272,18 +331,11 @@ def exec_multi(
     
     results = []
     
-    with Progress(
-        SpinnerColumn(),
-        TextColumn("[progress.description]{task.description}"),
-        BarColumn(),
-        TaskProgressColumn(),
-        console=console
-    ) as progress:
-        task = progress.add_task(f"[cyan]Executing on {len(host_list)} servers...", total=len(host_list))
-        
+    # JSON output mode - skip progress bars
+    if json_output:
         with ThreadPoolExecutor(max_workers=parallel) as executor:
             future_to_host = {
-                executor.submit(execute_on_host, host, command, timeout): host 
+                executor.submit(execute_on_host, host, command, timeout, retries): host 
                 for host in host_list
             }
             
@@ -292,7 +344,6 @@ def exec_multi(
                 try:
                     result = future.result()
                     results.append(result)
-                    progress.update(task, advance=1)
                 except Exception as e:
                     results.append({
                         'host': host,
@@ -301,7 +352,65 @@ def exec_multi(
                         'error': str(e),
                         'exit_code': -1
                     })
-                    progress.update(task, advance=1)
+    else:
+        with Progress(
+            SpinnerColumn(),
+            TextColumn("[progress.description]{task.description}"),
+            BarColumn(),
+            TaskProgressColumn(),
+            console=console
+        ) as progress:
+            task = progress.add_task(f"[cyan]Executing on {len(host_list)} servers...", total=len(host_list))
+            
+            with ThreadPoolExecutor(max_workers=parallel) as executor:
+                future_to_host = {
+                    executor.submit(execute_on_host, host, command, timeout, retries): host 
+                    for host in host_list
+                }
+                
+                for future in as_completed(future_to_host):
+                    host = future_to_host[future]
+                    try:
+                        result = future.result()
+                        results.append(result)
+                        progress.update(task, advance=1)
+                    except Exception as e:
+                        results.append({
+                            'host': host,
+                            'success': False,
+                            'output': '',
+                            'error': str(e),
+                            'exit_code': -1
+                        })
+                        progress.update(task, advance=1)
+    
+    success_count = sum(1 for r in results if r['success'])
+    failed_count = len(results) - success_count
+    
+    # JSON output mode
+    if json_output:
+        import json
+        output_data = {
+            "command": command,
+            "hosts": host_list,
+            "total": len(results),
+            "succeeded": success_count,
+            "failed": failed_count,
+            "results": [
+                {
+                    "host": r['host'],
+                    "success": r['success'],
+                    "exit_code": r['exit_code'],
+                    "output": r['output'],
+                    "error": r['error']
+                }
+                for r in results
+            ]
+        }
+        console.print(json.dumps(output_data, indent=2))
+        if failed_count > 0:
+            raise typer.Exit(code=1)
+        return
     
     console.print()
     
@@ -340,7 +449,9 @@ def exec_group(
     command: str = typer.Argument(..., help="Command to execute on group"),
     parallel: int = typer.Option(5, "--parallel", "-p", help="Number of parallel connections"),
     timeout: int = typer.Option(30, "--timeout", "-t", help="Command timeout in seconds"),
+    retries: int = typer.Option(0, "--retries", "-r", help="Number of retry attempts on failure"),
     dry_run: bool = typer.Option(False, "--dry-run", help="Show what would be executed without running"),
+    json_output: bool = typer.Option(False, "--json", help="Output results as JSON"),
     show_output: bool = typer.Option(True, "--show-output/--no-output", help="Show command output")
 ):
     """
@@ -400,18 +511,11 @@ def exec_group(
     
     results = []
     
-    with Progress(
-        SpinnerColumn(),
-        TextColumn("[progress.description]{task.description}"),
-        BarColumn(),
-        TaskProgressColumn(),
-        console=console
-    ) as progress:
-        task = progress.add_task(f"[cyan]Executing on {len(servers)} servers...", total=len(servers))
-        
+    # JSON output mode - skip progress bars
+    if json_output:
         with ThreadPoolExecutor(max_workers=parallel) as executor:
             future_to_host = {
-                executor.submit(execute_on_host, host, command, timeout): host 
+                executor.submit(execute_on_host, host, command, timeout, retries): host 
                 for host in servers
             }
             
@@ -420,7 +524,6 @@ def exec_group(
                 try:
                     result = future.result()
                     results.append(result)
-                    progress.update(task, advance=1)
                 except Exception as e:
                     results.append({
                         'host': host,
@@ -429,12 +532,79 @@ def exec_group(
                         'error': str(e),
                         'exit_code': -1
                     })
-                    progress.update(task, advance=1)
+    else:
+        with Progress(
+            SpinnerColumn(),
+            TextColumn("[progress.description]{task.description}"),
+            BarColumn(),
+            TaskProgressColumn(),
+            console=console
+        ) as progress:
+            task = progress.add_task(f"[cyan]Executing on {len(servers)} servers...", total=len(servers))
+            
+            with ThreadPoolExecutor(max_workers=parallel) as executor:
+                future_to_host = {
+                    executor.submit(execute_on_host, host, command, timeout, retries): host 
+                    for host in servers
+                }
+                
+                for future in as_completed(future_to_host):
+                    host = future_to_host[future]
+                    try:
+                        result = future.result()
+                        results.append(result)
+                        progress.update(task, advance=1)
+                    except Exception as e:
+                        results.append({
+                            'host': host,
+                            'success': False,
+                            'output': '',
+                            'error': str(e),
+                            'exit_code': -1
+                        })
+                        progress.update(task, advance=1)
     
     # Display results
-    console.print()
-    
     success_count = sum(1 for r in results if r['success'])
+    failed_count = len(results) - success_count
+    
+    # JSON output mode
+    if json_output:
+        import json
+        output_data = {
+            "command": command,
+            "group": group_name,
+            "total": len(results),
+            "succeeded": success_count,
+            "failed": failed_count,
+            "results": [
+                {
+                    "host": r['host'],
+                    "success": r['success'],
+                    "exit_code": r['exit_code'],
+                    "output": r['output'],
+                    "error": r['error']
+                }
+                for r in results
+            ]
+        }
+        console.print(json.dumps(output_data, indent=2))
+        
+        # Audit log
+        from omnihost.audit import log_command_execution
+        log_command_execution(
+            command_type="exec-group",
+            hosts=servers,
+            command=command,
+            results={r['host']: r for r in results},
+            metadata={"group": group_name, "parallel": parallel, "timeout": timeout, "retries": retries}
+        )
+        
+        if failed_count > 0:
+            raise typer.Exit(code=1)
+        return
+    
+    console.print()
     failed_count = len(results) - success_count
     
     # Summary table
