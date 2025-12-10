@@ -24,8 +24,22 @@ Manage hundreds of servers with lightning-fast parallel execution, beautiful CLI
 omnihost --version              # Check version
 omnihost examples               # See usage examples
 
+# Server Groups - organize your infrastructure
+omnihost group add web web01 web02 web03
+omnihost exec-group web "systemctl restart nginx"
+omnihost exec-group web "uptime" --dry-run  # Preview first!
+
+# Command Aliases - reduce repetitive typing
+omnihost alias add restart-nginx "sudo systemctl restart nginx"
+omnihost exec-group web restart-nginx
+
+# File Transfer - push/pull files easily
+omnihost push web01 ./app.tar /opt/app/
+omnihost pull db01 /var/log/mysql.log ./logs/
+omnihost push web01 ./dist /var/www/ --recursive
+
 # Execute on all servers in parallel - 10x faster than serial execution
-omnihost exec-all "systemctl status nginx" --parallel 10
+omnihost exec-all "systemctl status nginx" --parallel 10 --dry-run
 
 # Quick DevOps shortcuts - no need to type full exec commands
 omnihost uptime  # Uses default server
@@ -38,6 +52,9 @@ omnihost list  # Stunning table view of all servers
 # Enhanced logging for troubleshooting
 omnihost --verbose exec web01 "ls -la"
 omnihost --debug exec-all "uptime"
+
+# Audit logging - all commands tracked automatically
+cat ~/.omnihost/audit.log  # JSON audit trail
 ```
 
 ## 🎯 Why OmniHost?

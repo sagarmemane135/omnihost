@@ -18,6 +18,9 @@ from omnihost.commands.connect_command import register_connect_command
 from omnihost.commands.bulk_operations import register_bulk_commands
 from omnihost.commands.quick_commands import register_quick_commands
 from omnihost.commands.config_command import register_config_command
+from omnihost.commands.group_management import register_group_commands
+from omnihost.commands.alias_management import register_alias_commands
+from omnihost.commands.file_transfer import register_file_transfer_commands
 
 console = Console()
 
@@ -143,6 +146,9 @@ register_connect_command(app)
 register_bulk_commands(app)
 register_quick_commands(app)
 register_config_command(app)
+register_group_commands(app)
+register_alias_commands(app)
+register_file_transfer_commands(app)
 
 
 def main():

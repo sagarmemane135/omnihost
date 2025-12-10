@@ -7,7 +7,41 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
-### Added
+### Added - Phase 1: High-ROI Features
+
+#### Server Groups & Organization
+- `group add/remove/list/show` commands for organizing servers
+- `group add-server` and `remove-server` for managing group membership
+- `exec-group` command to execute commands on all servers in a group
+- Server tags support for flexible categorization
+- Group-based bulk operations with `--dry-run` support
+
+#### Command Aliases & Macros
+- `alias add/remove/list/show` commands for reusable command shortcuts
+- Store frequently used commands as aliases
+- Reduce typing and improve consistency
+
+#### File Transfer (SFTP)
+- `push` command to upload files/directories to remote servers
+- `pull` command to download files/directories from remote servers  
+- Recursive directory transfer with `--recursive` flag
+- Progress bars with transfer speed indicators
+- Automatic parent directory creation
+
+#### Safety & Dry-Run Mode
+- `--dry-run` flag for `exec-all`, `exec-multi`, and `exec-group`
+- Preview affected servers and commands before execution
+- Prevents accidental mass operations
+- Shows detailed impact summary
+
+#### Audit Logging
+- Automatic command execution logging to `~/.omnihost/audit.log`
+- JSON-formatted audit entries with timestamps
+- Track user, hosts, commands, and results
+- Success/failure statistics per execution
+- Searchable audit history for compliance
+
+#### CLI Best Practices
 - `--version` flag for quick version check (works standalone)
 - `version` command showing detailed version information
 - `examples` command with formatted usage examples
@@ -18,6 +52,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Changed
 - Improved CLI user experience following best practices
 - Enhanced error handling with meaningful exit codes
+- Config schema extended with groups, tags, and aliases (backward compatible)
 
 ## [1.0.0] - 2025-12-10
 

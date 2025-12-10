@@ -26,6 +26,7 @@ def register_bulk_commands(app: typer.Typer):
     """Register bulk operation commands."""
     app.command(name="exec-all")(exec_all)
     app.command(name="exec-multi")(exec_multi)
+    app.command(name="exec-group")(exec_group)
 
 
 def execute_on_host(host_alias: str, command: str, timeout: int = 30) -> Dict:
@@ -68,6 +69,7 @@ def exec_all(
     command: str = typer.Argument(..., help="Command to execute on all servers"),
     parallel: int = typer.Option(5, "--parallel", "-p", help="Number of parallel connections"),
     timeout: int = typer.Option(30, "--timeout", "-t", help="Command timeout in seconds"),
+    dry_run: bool = typer.Option(False, "--dry-run", help="Show what would be executed without running"),
     continue_on_error: bool = typer.Option(True, "--continue/--stop", help="Continue on errors"),
     show_output: bool = typer.Option(True, "--show-output/--no-output", help="Show command output")
 ):
@@ -78,6 +80,7 @@ def exec_all(
         omnihost exec-all "uptime"
         omnihost exec-all "df -h" --parallel 10
         omnihost exec-all "systemctl status nginx" --timeout 10
+        omnihost exec-all "rm -rf /tmp/*" --dry-run
     """
     hosts = get_all_hosts()
     
@@ -86,6 +89,32 @@ def exec_all(
         return
     
     host_aliases = [h['alias'] for h in hosts]
+    
+    # Dry-run mode
+    if dry_run:
+        console.print(Panel(
+            f"[cyan]Command:[/cyan] {command}\n"
+            f"[cyan]Targets:[/cyan] {len(host_aliases)} servers\n"
+            f"[yellow]Mode:[/yellow] DRY RUN (no execution)",
+            title="🔍 Dry Run Preview",
+            border_style="yellow",
+            box=box.ROUNDED
+        ))
+        console.print()
+        
+        table = Table(title="Affected Servers", box=box.ROUNDED)
+        table.add_column("#", justify="right", style="dim")
+        table.add_column("Server", style="cyan")
+        table.add_column("Hostname", style="white")
+        table.add_column("Command", style="yellow")
+        
+        for idx, host_info in enumerate(hosts, 1):
+            table.add_row(str(idx), host_info['alias'], host_info.get('hostname', 'N/A'), command)
+        
+        console.print(table)
+        console.print(f"\n[yellow]⚠[/yellow]  This is a dry run. Use without --dry-run to execute.")
+        console.print(f"[dim]Would execute on {len(host_aliases)} servers with {parallel} parallel connections[/dim]")
+        return
     
     console.print(Panel(
         f"[cyan]Command:[/cyan] {command}\n"
@@ -194,7 +223,8 @@ def exec_multi(
     hosts: str = typer.Argument(..., help="Comma-separated list of host aliases"),
     command: str = typer.Argument(..., help="Command to execute"),
     parallel: int = typer.Option(5, "--parallel", "-p", help="Number of parallel connections"),
-    timeout: int = typer.Option(30, "--timeout", "-t", help="Command timeout in seconds")
+    timeout: int = typer.Option(30, "--timeout", "-t", help="Command timeout in seconds"),
+    dry_run: bool = typer.Option(False, "--dry-run", help="Show what would be executed without running")
 ):
     """
     Execute a command on specific servers (comma-separated list).
@@ -202,8 +232,33 @@ def exec_multi(
     Example:
         omnihost exec-multi "web01,web02,web03" "systemctl restart nginx"
         omnihost exec-multi "db01,db02" "pg_isready" --parallel 2
+        omnihost exec-multi "web01,db01" "uptime" --dry-run
     """
     host_list = [h.strip() for h in hosts.split(',')]
+    
+    # Dry-run mode
+    if dry_run:
+        console.print(Panel(
+            f"[cyan]Command:[/cyan] {command}\n"
+            f"[cyan]Targets:[/cyan] {', '.join(host_list)}\n"
+            f"[yellow]Mode:[/yellow] DRY RUN (no execution)",
+            title="🔍 Dry Run Preview",
+            border_style="yellow",
+            box=box.ROUNDED
+        ))
+        console.print()
+        
+        table = Table(title="Affected Servers", box=box.ROUNDED)
+        table.add_column("#", justify="right", style="dim")
+        table.add_column("Server", style="cyan")
+        table.add_column("Command", style="yellow")
+        
+        for idx, host in enumerate(host_list, 1):
+            table.add_row(str(idx), host, command)
+        
+        console.print(table)
+        console.print(f"\n[yellow]⚠[/yellow]  This is a dry run. Use without --dry-run to execute.")
+        return
     
     console.print(Panel(
         f"[cyan]Command:[/cyan] {command}\n"
@@ -272,6 +327,171 @@ def exec_multi(
             border_style=border_style,
             box=box.ROUNDED
         ))
+    
+    success_count = sum(1 for r in results if r['success'])
+    console.print(f"\n[bold]Summary:[/bold] {success_count}/{len(results)} successful")
+    
+    if success_count < len(results):
+        raise typer.Exit(code=1)
+
+
+def exec_group(
+    group_name: str = typer.Argument(..., help="Group name"),
+    command: str = typer.Argument(..., help="Command to execute on group"),
+    parallel: int = typer.Option(5, "--parallel", "-p", help="Number of parallel connections"),
+    timeout: int = typer.Option(30, "--timeout", "-t", help="Command timeout in seconds"),
+    dry_run: bool = typer.Option(False, "--dry-run", help="Show what would be executed without running"),
+    show_output: bool = typer.Option(True, "--show-output/--no-output", help="Show command output")
+):
+    """
+    Execute a command on all servers in a group.
+    
+    Example:
+        omnihost exec-group web "systemctl restart nginx"
+        omnihost exec-group db "pg_dump mydb" --parallel 3
+        omnihost exec-group prod "uptime" --dry-run
+    """
+    from omnihost import config
+    
+    servers = config.get_group_servers(group_name)
+    
+    if not servers:
+        console.print(f"[red]✗[/red] Group '[cyan]{group_name}[/cyan]' not found or empty")
+        console.print("[yellow]Use 'omnihost group list' to see available groups[/yellow]")
+        raise typer.Exit(1)
+    
+    # Dry-run mode
+    if dry_run:
+        console.print(Panel(
+            f"[cyan]Command:[/cyan] {command}\n"
+            f"[cyan]Group:[/cyan] {group_name}\n"
+            f"[cyan]Targets:[/cyan] {len(servers)} servers\n"
+            f"[yellow]Mode:[/yellow] DRY RUN (no execution)",
+            title="🔍 Dry Run Preview",
+            border_style="yellow",
+            box=box.ROUNDED
+        ))
+        console.print()
+        
+        table = Table(title="Affected Servers", box=box.ROUNDED)
+        table.add_column("#", justify="right", style="dim")
+        table.add_column("Server", style="cyan")
+        table.add_column("Command", style="yellow")
+        
+        for idx, server in enumerate(servers, 1):
+            table.add_row(str(idx), server, command)
+        
+        console.print(table)
+        console.print(f"\n[yellow]⚠[/yellow]  This is a dry run. Use without --dry-run to execute.")
+        return
+    
+    # Real execution
+    console.print(Panel(
+        f"[cyan]Command:[/cyan] {command}\n"
+        f"[cyan]Group:[/cyan] {group_name}\n"
+        f"[cyan]Targets:[/cyan] {len(servers)} servers\n"
+        f"[cyan]Parallel:[/cyan] {parallel} connections\n"
+        f"[cyan]Timeout:[/cyan] {timeout}s",
+        title="🚀 Group Execution",
+        border_style="cyan",
+        box=box.ROUNDED
+    ))
+    console.print()
+    
+    results = []
+    
+    with Progress(
+        SpinnerColumn(),
+        TextColumn("[progress.description]{task.description}"),
+        BarColumn(),
+        TaskProgressColumn(),
+        console=console
+    ) as progress:
+        task = progress.add_task(f"[cyan]Executing on {len(servers)} servers...", total=len(servers))
+        
+        with ThreadPoolExecutor(max_workers=parallel) as executor:
+            future_to_host = {
+                executor.submit(execute_on_host, host, command, timeout): host 
+                for host in servers
+            }
+            
+            for future in as_completed(future_to_host):
+                host = future_to_host[future]
+                try:
+                    result = future.result()
+                    results.append(result)
+                    progress.update(task, advance=1)
+                except Exception as e:
+                    results.append({
+                        'host': host,
+                        'success': False,
+                        'output': '',
+                        'error': str(e),
+                        'exit_code': -1
+                    })
+                    progress.update(task, advance=1)
+    
+    # Display results
+    console.print()
+    
+    success_count = sum(1 for r in results if r['success'])
+    failed_count = len(results) - success_count
+    
+    # Summary table
+    table = Table(title="Execution Summary", box=box.ROUNDED)
+    table.add_column("Server", style="cyan")
+    table.add_column("Status", style="bold")
+    table.add_column("Exit Code", justify="center")
+    table.add_column("Output Preview", style="dim")
+    
+    for result in results:
+        status = "[green]✓ Success[/green]" if result['success'] else "[red]✗ Failed[/red]"
+        preview = result['output'][:50].replace('\n', ' ') if result['output'] else result['error'][:50].replace('\n', ' ')
+        table.add_row(
+            result['host'],
+            status,
+            str(result['exit_code']),
+            preview
+        )
+    
+    console.print(table)
+    console.print()
+    console.print(f"[bold]Results:[/bold] [green]{success_count} successful[/green], [red]{failed_count} failed[/red]")
+    
+    # Show detailed output if requested
+    if show_output:
+        console.print("\n[bold cyan]Detailed Output:[/bold cyan]")
+        for result in results:
+            title = f"{result['host']}"
+            border_style = "green" if result['success'] else "red"
+            
+            content = ""
+            if result['output']:
+                content += result['output'].rstrip()
+            if result['error']:
+                if content:
+                    content += "\n\n[red bold]Errors:[/red bold]\n"
+                content += f"[red]{result['error'].rstrip()}[/red]"
+            
+            if not content:
+                content = "[dim]No output[/dim]"
+            
+            console.print(Panel(
+                content,
+                title=title,
+                border_style=border_style,
+                box=box.ROUNDED
+            ))
+    
+    # Audit log
+    from omnihost.audit import log_command_execution
+    log_command_execution(
+        command_type="exec-group",
+        hosts=servers,
+        command=command,
+        results={r['host']: r for r in results},
+        metadata={"group": group_name, "parallel": parallel, "timeout": timeout}
+    )
     
     success_count = sum(1 for r in results if r['success'])
     console.print(f"\n[bold]Summary:[/bold] {success_count}/{len(results)} successful")

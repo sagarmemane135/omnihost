@@ -18,6 +18,37 @@ omnihost edit <host>                   # Edit server config
 omnihost remove <host>                 # Remove server
 ```
 
+## 👥 Server Groups
+```bash
+omnihost group add web web01 web02 web03  # Create group
+omnihost group list                    # List all groups
+omnihost group show web                # Show group members
+omnihost group add-server web web04    # Add server to group
+omnihost group remove-server web web04 # Remove server from group
+omnihost group remove web              # Delete group
+omnihost exec-group web "uptime"       # Execute on group
+omnihost exec-group web "cmd" --dry-run # Preview execution
+```
+
+## 🔖 Command Aliases
+```bash
+omnihost alias add restart-nginx "sudo systemctl restart nginx"
+omnihost alias add check-disk "df -h /"
+omnihost alias list                    # List all aliases
+omnihost alias show restart-nginx      # Show alias details
+omnihost alias remove restart-nginx    # Delete alias
+```
+
+## 📁 File Transfer (SFTP)
+```bash
+omnihost push <host> <local> <remote>  # Upload file
+omnihost pull <host> <remote> <local>  # Download file
+omnihost push web01 ./app.tar /opt/app/
+omnihost pull db01 /var/log/app.log ./logs/
+omnihost push web01 ./dist /var/www/ -r  # Recursive directory
+omnihost pull web01 /etc/nginx ./backup/ -r
+```
+
 ## 🔌 Remote Execution
 ```bash
 omnihost exec <host> "<command>"       # Execute command (formatted output)
@@ -52,10 +83,17 @@ omnihost exec-all "<command>"
 omnihost exec-all "<cmd>" -p 10        # 10 parallel connections
 omnihost exec-all "<cmd>" -t 60        # 60 second timeout
 omnihost exec-all "<cmd>" --no-output  # Summary only (hide outputs)
+omnihost exec-all "<cmd>" --dry-run    # Preview before execution
 
 # Execute on specific servers
 omnihost exec-multi "h1,h2,h3" "<cmd>"     # Comma-separated list
 omnihost exec-multi "web01,web02" "<cmd>" -p 3  # With parallelism
+omnihost exec-multi "h1,h2" "<cmd>" --dry-run  # Preview first
+
+# Execute on server groups
+omnihost exec-group web "systemctl restart nginx"
+omnihost exec-group db "pg_dump mydb" -p 3
+omnihost exec-group prod "uptime" --dry-run  # Always preview on prod!
 ```
 
 ## 🎛️ Global Options
@@ -77,7 +115,30 @@ omnihost exec-multi "web01,web02" "<cmd>" -p 3  # With parallelism
 -f, --follow           # Follow logs in real-time
 ```
 
+## 🔍 Audit & Compliance
+```bash
+cat ~/.omnihost/audit.log              # View audit trail (JSON)
+tail -f ~/.omnihost/audit.log          # Monitor in real-time
+grep '"user": "alice"' ~/.omnihost/audit.log  # Filter by user
+```
+
 ## 💡 Quick Examples
+
+### Server Groups Workflow
+```bash
+# Organize servers
+omnihost group add web web01 web02 web03
+omnihost group add db db01 db02
+omnihost group add prod web01 db01
+
+# Execute safely with dry-run
+omnihost exec-group web "systemctl restart nginx" --dry-run
+omnihost exec-group web "systemctl restart nginx"  # Now execute
+
+# File deployment
+omnihost push web01 ./app-v2.tar /opt/app/
+omnihost exec-group web "cd /opt/app && tar xf app-v2.tar"
+```
 
 ### Daily Operations
 ```bash
