@@ -10,6 +10,7 @@ from rich import box
 
 from omnihost.ssh_config import parse_ssh_config
 from omnihost.ssh_client import create_ssh_client
+from omnihost.history import add_to_history
 
 console = Console()
 
@@ -121,6 +122,18 @@ def exec_command(
                     border_style="green",
                     box=box.ROUNDED
                 ))
+        
+        # Add to history
+        try:
+            add_to_history(
+                command="exec",
+                args=[command],
+                hosts=[host],
+                success=(exit_status == 0),
+                metadata={"exit_code": exit_status, "plain": plain, "compact": compact}
+            )
+        except:
+            pass  # Don't fail command if history fails
         
         # Exit with command's exit status
         if exit_status != 0:

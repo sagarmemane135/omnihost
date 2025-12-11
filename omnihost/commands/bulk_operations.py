@@ -18,6 +18,7 @@ from rich.live import Live
 
 from omnihost.ssh_config import get_all_hosts, parse_ssh_config
 from omnihost.ssh_client import create_ssh_client
+from omnihost.history import add_to_history
 
 console = Console()
 
@@ -272,6 +273,25 @@ def exec_all(
     
     console.print(Panel(summary_text, box=box.ROUNDED))
     
+    # Add to history
+    try:
+        add_to_history(
+            command="exec-all",
+            args=[command],
+            hosts=[r['host'] for r in results],
+            success=(failed_count == 0),
+            metadata={
+                "total": len(results),
+                "succeeded": success_count,
+                "failed": failed_count,
+                "parallel": parallel,
+                "timeout": timeout,
+                "retries": retries
+            }
+        )
+    except:
+        pass  # Don't fail command if history fails
+    
     if failed_count > 0 and not continue_on_error:
         raise typer.Exit(code=1)
 
@@ -439,6 +459,25 @@ def exec_multi(
     
     success_count = sum(1 for r in results if r['success'])
     console.print(f"\n[bold]Summary:[/bold] {success_count}/{len(results)} successful")
+    
+    # Add to history
+    try:
+        add_to_history(
+            command="exec-multi",
+            args=[command],
+            hosts=host_list,
+            success=(success_count == len(results)),
+            metadata={
+                "hosts_list": hosts,
+                "total": len(results),
+                "succeeded": success_count,
+                "failed": len(results) - success_count,
+                "parallel": parallel,
+                "timeout": timeout
+            }
+        )
+    except:
+        pass  # Don't fail command if history fails
     
     if success_count < len(results):
         raise typer.Exit(code=1)
@@ -666,5 +705,25 @@ def exec_group(
     success_count = sum(1 for r in results if r['success'])
     console.print(f"\n[bold]Summary:[/bold] {success_count}/{len(results)} successful")
     
+    # Add to history
+    try:
+        add_to_history(
+            command="exec-group",
+            args=[command],
+            hosts=servers,
+            success=(success_count == len(results)),
+            metadata={
+                "group_name": group_name,
+                "total": len(results),
+                "succeeded": success_count,
+                "failed": len(results) - success_count,
+                "parallel": parallel,
+                "timeout": timeout
+            }
+        )
+    except:
+        pass  # Don't fail command if history fails
+    
     if success_count < len(results):
         raise typer.Exit(code=1)
+
