@@ -84,22 +84,30 @@ omnihost logs <host> /path/to/log      # Custom log file
 omnihost exec-all "<command>"          
 omnihost exec-all "<cmd>" -p 10        # 10 parallel connections
 omnihost exec-all "<cmd>" -t 60        # 60 second timeout
-omnihost exec-all "<cmd>" --no-output  # Summary only (hide outputs)
+omnihost exec-all "<cmd>" --show-output  # Show detailed output (opt-in)
 omnihost exec-all "<cmd>" --dry-run    # Preview before execution
 omnihost exec-all "<cmd>" --retries 3  # Retry failed commands 3 times
-omnihost exec-all "<cmd>" --json       # JSON output for CI/CD
+
+# Production-ready output modes
+omnihost exec-all "<cmd>" --json       # Pure JSON for CI/CD pipelines
+omnihost exec-all "<cmd>" --csv        # CSV for spreadsheets/reports
+omnihost exec-all "<cmd>" --quiet      # Minimal scriptable output
+omnihost exec-all "<cmd>" --plain      # Plain text (no ANSI colors)
+omnihost exec-all "<cmd>" --compact    # Condensed single-line format
 
 # Execute on specific servers
 omnihost exec-multi "h1,h2,h3" "<cmd>"     # Comma-separated list
 omnihost exec-multi "web01,web02" "<cmd>" -p 3  # With parallelism
 omnihost exec-multi "h1,h2" "<cmd>" --dry-run  # Preview first
-omnihost exec-multi "h1,h2" "<cmd>" --retries 2 --json  # Retry + JSON
+omnihost exec-multi "h1,h2" "<cmd>" --json     # JSON output
+omnihost exec-multi "h1,h2" "<cmd>" --quiet    # Minimal output
 
 # Execute on server groups
 omnihost exec-group web "systemctl restart nginx"
 omnihost exec-group db "pg_dump mydb" -p 3
 omnihost exec-group prod "uptime" --dry-run  # Always preview on prod!
-omnihost exec-group web "<cmd>" --retries 3   # With retry
+omnihost exec-group web "<cmd>" --json       # JSON output
+omnihost exec-group prod "<cmd>" --csv       # CSV export
 ```
 
 ## 🎛️ Global Options
@@ -119,15 +127,55 @@ export OMNIHOST_TIMEOUT=60              # Set default timeout
 export OMNIHOST_AUDIT_ENABLED=true      # Enable/disable audit logging
 ```
 
-## 🎛️ Common Command Options
+## 🏛️ Common Command Options
 ```bash
 -p, --parallel N       # Parallel connections (default: 5, range: 1-20)
 -t, --timeout N        # Timeout in seconds (default: 30)
---show-output          # Show individual outputs (default for bulk ops)
---no-output            # Hide outputs, show summary only
---plain                # Plain output without Rich formatting
+--show-output          # Show detailed output (opt-in, for bulk ops)
+--plain                # Plain output without Rich formatting (single exec)
 -n, --lines N          # Number of log lines (for logs command)
 -f, --follow           # Follow logs in real-time
+
+# Output modes (for bulk operations: exec-all, exec-multi, exec-group)
+--json                 # Pure JSON output (no decorations, pipe to jq)
+--csv                  # CSV format for spreadsheets/databases
+--quiet, -q            # Minimal one-line output per server
+--plain                # Simple text without ANSI colors
+--compact              # Condensed single-line format
+```
+
+## 📊 Output Modes for Automation
+
+OmniHost provides multiple output formats optimized for different workflows:
+
+| Mode | Flag | Best For | Output Style |
+|------|------|----------|-------------|
+| **Interactive** | (default) | Human use | Rich formatting, colors, panels |
+| **JSON** | `--json` | CI/CD, parsing | Pure JSON, no decorations |
+| **CSV** | `--csv` | Reports, Excel | CSV format with headers |
+| **Quiet** | `--quiet`, `-q` | Shell scripts | One line per server: host: ✓ [0] output |
+| **Plain** | `--plain` | Logs, legacy | Simple text, no ANSI codes |
+| **Compact** | `--compact` | Quick checks | Single line: ✓ host [0]: preview |
+
+**Examples:**
+```bash
+# Parse with jq in CI/CD
+omnihost exec-all 'hostname' --json | jq -r '.results[] | select(.success) | .host'
+
+# Export to spreadsheet
+omnihost exec-all 'uptime' --csv > server_uptime.csv
+
+# Shell script integration
+for line in $(omnihost exec-all 'hostname' --quiet); do
+  host=$(echo $line | cut -d: -f1)
+  echo "Processing $host"
+done
+
+# Plain text for logging
+omnihost exec-all 'systemctl status app' --plain >> /var/log/deploy.log 2>&1
+
+# Quick status check
+omnihost exec-all 'df -h /' --compact | grep -E '(9[0-9]|100)%'
 ```
 
 ## ⚙️ Configuration Management
@@ -168,13 +216,21 @@ omnihost exec-group web "cd /opt/app && tar xf app-v2.tar"
 ### Daily Operations
 ```bash
 # Morning check: all servers up?
-omnihost exec-all "uptime"
+omnihost exec-all "uptime" --compact
 
 # Check disk space across infrastructure
-omnihost exec-all "df -h /" -p 10
+omnihost exec-all "df -h /" -p 10 --compact
 
-# Retry transient failures
-omnihost exec-all "curl https://api.example.com/health" --retries 3
+# Export server inventory
+omnihost exec-all "hostname && uname -r" --csv > inventory.csv
+
+# Shell script automation
+omnihost exec-all "systemctl is-active nginx" --quiet | while read line; do
+  if echo $line | grep -q '✗'; then
+    host=$(echo $line | cut -d: -f1)
+    echo "ALERT: nginx down on $host" | mail -s "Alert" ops@example.com
+  fi
+done
 
 # CI/CD Integration - JSON output
 omnihost exec-all "systemctl status app" --json | jq '.succeeded'

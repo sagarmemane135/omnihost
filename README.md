@@ -42,6 +42,13 @@ omnihost push web01 ./dist /var/www/ --recursive
 omnihost exec-all "systemctl status nginx" --parallel 10 --retries 2 --dry-run
 omnihost exec-all "uptime" --json | jq '.succeeded'  # CI/CD integration
 
+# Production-ready output modes for DevOps automation
+omnihost exec-all "hostname" --json       # Pure JSON (pipe to jq)
+omnihost exec-all "uptime" --csv          # CSV for spreadsheets
+omnihost exec-all "df -h" --quiet         # Minimal scriptable output
+omnihost exec-all "ps aux" --compact      # Condensed single-line
+omnihost exec-all "systemctl status nginx" --plain  # No colors/formatting
+
 # Quick DevOps shortcuts - no need to type full exec commands
 omnihost uptime  # Uses default server
 omnihost disk web01
@@ -95,10 +102,12 @@ omnihost profile show profile.prof   # Analyze performance
 
 ### ⚡ Performance Features
 - **Parallel execution** on multiple servers (5-20x faster)
-- **Bulk operations** (`exec-all`, `exec-multi`)
+- **Bulk operations** (`exec-all`, `exec-multi`, `exec-group`)
 - **Quick commands** for common DevOps tasks
 - **Default server** configuration (no need to specify every time)
 - **Connection pooling** and caching
+- **Production-ready output modes** (JSON, CSV, quiet, plain, compact)
+- **Scriptable output** for CI/CD pipelines and automation
 
 ### 🎨 Beautiful CLI
 - Rich formatted output with colors and panels
@@ -202,6 +211,14 @@ omnihost exec-all "uptime"
 
 # Specific servers
 omnihost exec-multi "web01,web02,db01" "systemctl status nginx"
+
+# Production-ready output modes
+omnihost exec-all "hostname" --json        # Pure JSON for parsing
+omnihost exec-all "uptime" --csv           # CSV for reports
+omnihost exec-all "df -h" --quiet          # Minimal for scripts
+omnihost exec-all "ps aux" --plain         # No ANSI colors
+omnihost exec-all "ls -la" --compact       # One line per server
+omnihost exec-all "uptime" --show-output   # Show detailed output (opt-in)
 ```
 
 ### 5. Quick DevOps Commands
@@ -223,6 +240,47 @@ omnihost connect web01
 ```
 
 ## ⚙️ Configuration
+
+### Output Modes for DevOps Automation
+
+OmniHost provides multiple output formats optimized for different use cases:
+
+| Mode | Flag | Use Case | Example |
+|------|------|----------|----------|
+| **JSON** | `--json` | CI/CD pipelines, parsing with jq | `omnihost exec-all 'cmd' --json \| jq` |
+| **CSV** | `--csv` | Spreadsheets, reports, analytics | `omnihost exec-all 'cmd' --csv > report.csv` |
+| **Quiet** | `--quiet`, `-q` | Shell scripts, log files | `omnihost exec-all 'cmd' --quiet` |
+| **Plain** | `--plain` | Legacy systems, plain text logs | `omnihost exec-all 'cmd' --plain` |
+| **Compact** | `--compact` | Quick checks, condensed output | `omnihost exec-all 'cmd' --compact` |
+| **Default** | (none) | Interactive use, rich formatting | `omnihost exec-all 'cmd'` |
+
+**Key Features:**
+- `--json` outputs pure JSON (no decorative panels) - perfect for piping to `jq`
+- `--csv` exports to CSV format - import into Excel or databases
+- `--quiet` provides minimal one-line output per server - ideal for scripts
+- `--plain` removes all ANSI formatting - for legacy terminals or log files  
+- `--compact` shows condensed single-line format - quick status checks
+- `--show-output` displays detailed command output (opt-in, default is summary only)
+
+**Examples:**
+```bash
+# Parse JSON in CI/CD pipeline
+omnihost exec-all 'hostname' --json | jq -r '.results[].output'
+
+# Export to spreadsheet
+omnihost exec-all 'uptime' --csv > server_uptime.csv
+
+# Shell script integration
+for server in $(omnihost exec-all 'hostname' --quiet | grep '✓' | cut -d: -f1); do
+  echo "Processing $server"
+done
+
+# Clean logs without colors
+omnihost exec-all 'systemctl status nginx' --plain >> audit.log
+
+# Quick status check
+omnihost exec-all 'df -h /' --compact
+```
 
 ### Environment Variables
 
@@ -273,7 +331,15 @@ omnihost config import my-config.json --merge  # Merge with existing
 omnihost exec-all "uptime && free -h" --parallel 10
 
 # Check disk space across infrastructure
-omnihost exec-all "df -h /" --no-output | grep "9[0-9]%"
+omnihost exec-all "df -h /" --compact | grep "9[0-9]%"
+
+# Export server inventory to CSV
+omnihost exec-all "hostname && cat /etc/os-release | grep PRETTY_NAME" --csv > inventory.csv
+
+# Quick status check in shell script
+if omnihost exec-all 'systemctl is-active nginx' --quiet | grep -q '✗'; then
+  echo "Alert: Some servers have nginx down!"
+fi
 ```
 
 ### Deployments
@@ -329,12 +395,20 @@ omnihost/
 
 ### Execution
 | Command | Description | Example |
-|---------|-------------|---------|
+|---------|-------------|----------|
 | `exec` | Execute command on server | `omnihost exec myserver "ls -la"` |
 | `connect` | Open interactive shell | `omnihost connect myserver` |
 | `exec-all` | Execute on all servers | `omnihost exec-all "uptime" --parallel 10` |
 | `exec-multi` | Execute on specific servers | `omnihost exec-multi "web01,web02" "df -h"` |
 | `exec-group` | Execute on server group | `omnihost exec-group web "systemctl restart nginx"` |
+
+**Output Mode Flags** (available for all bulk commands):
+- `--json` - Pure JSON output for parsing
+- `--csv` - CSV format for spreadsheets
+- `--quiet` / `-q` - Minimal scriptable output
+- `--plain` - No ANSI colors/formatting
+- `--compact` - Condensed single-line format
+- `--show-output` - Display detailed command output
 
 ### Configuration
 | Command | Description | Example |

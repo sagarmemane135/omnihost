@@ -7,6 +7,48 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added - Production-Ready Output Modes (2025-12-11)
+
+#### DevOps Automation & Scriptability
+- **`--json` flag** with pure JSON output (no decorative panels) for CI/CD pipelines
+  - Perfect for piping to `jq` or parsing in scripts
+  - Structured output with command, hosts, success/failure counts
+  - Available in exec-all, exec-multi, exec-group
+- **`--csv` flag** for spreadsheet/reporting integration
+  - Export results to CSV format with headers
+  - Import into Excel, databases, or analytics tools
+- **`--quiet` / `-q` flag** for minimal scriptable output
+  - One-line output per server: `host: ✓ [0] output`
+  - Perfect for shell scripts and log files
+- **`--plain` flag** for simple text without ANSI formatting
+  - No colors or Rich formatting
+  - Compatible with legacy terminals and plain text logs
+- **`--compact` flag** for condensed single-line format
+  - Quick status checks with minimal output
+  - Shows: `✓ host [exit_code]: preview`
+- **`--show-output` flag** now opt-in (was always-on)
+  - Default behavior: show summary table only
+  - Use `--show-output` to display detailed command output
+  - Reduces terminal clutter for bulk operations
+
+#### Enhancements
+- **Output preview increased** from 50 to 150 characters (3x more context)
+- **Progress bars suppressed** for machine-readable formats (json, csv, quiet)
+- **Decorative panels skipped** when using automation-friendly output modes
+- All output modes available across exec-all, exec-multi, exec-group
+
+### Fixed - Command History Integration (2025-12-11)
+
+#### History Tracking
+- Fixed history feature not recording commands
+- Added `add_to_history()` integration to all command execution paths:
+  - `exec` command now tracks single server executions
+  - `exec-all` tracks bulk operations with success/failure counts
+  - `exec-multi` tracks multi-server operations
+  - `exec-group` tracks group-based operations
+- History now captures metadata: exit codes, parallel settings, retry counts
+- History file (`~/.omnihost/history.json`) automatically created on first use
+
 ### Added - Phase 2: Reliability & Integration
 
 #### Retry Logic with Exponential Backoff
