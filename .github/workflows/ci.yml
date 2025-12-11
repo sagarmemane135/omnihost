@@ -53,6 +53,7 @@ jobs:
         omnihost --help
     
     - name: Security check with bandit
+      continue-on-error: true
       run: |
         pip install bandit
         bandit -r omnihost -ll

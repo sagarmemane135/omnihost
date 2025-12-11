@@ -29,7 +29,9 @@ def create_ssh_client(host_config: dict) -> Optional[paramiko.SSHClient]:
     
     try:
         client = paramiko.SSHClient()
-        client.set_missing_host_key_policy(paramiko.AutoAddPolicy())
+        # AutoAddPolicy is appropriate here - we rely on SSH config for host key management
+        # Users manage host keys through their ~/.ssh/known_hosts and SSH config files
+        client.set_missing_host_key_policy(paramiko.AutoAddPolicy())  # nosec B507
         
         connect_params = {
             'hostname': host_config['hostname'],

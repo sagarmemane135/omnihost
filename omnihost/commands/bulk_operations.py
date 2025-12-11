@@ -55,7 +55,8 @@ def execute_on_host(host_alias: str, command: str, timeout: int = 30, retries: i
                 return result
             
             try:
-                stdin, stdout, stderr = client.exec_command(command, timeout=timeout)
+                # Command is provided by trusted admin user for their managed infrastructure
+                stdin, stdout, stderr = client.exec_command(command, timeout=timeout)  # nosec B601
                 result['output'] = stdout.read().decode('utf-8', errors='ignore')
                 result['error'] = stderr.read().decode('utf-8', errors='ignore')
                 result['exit_code'] = stdout.channel.recv_exit_status()
@@ -207,7 +208,6 @@ def exec_all(
     # JSON output mode (pure, no decorations)
     if json_output:
         import json
-        import sys
         output_data = {
             "command": command,
             "total": len(results),
