@@ -447,16 +447,47 @@ OmniHost can create and manage this file for you!
 
 ## 🤝 Contributing
 
-We welcome contributions! See [CONTRIBUTING.md](CONTRIBUTING.md) for guidelines.
+We welcome contributions! Please read [CONTRIBUTING.md](CONTRIBUTING.md) for detailed guidelines.
 
-**Quick start:**
+### Quick Start
+
 ```bash
-git clone https://github.com/sagarmemane135/omnihost.git
+# Fork and clone the repository
+git clone https://github.com/YOUR_USERNAME/omnihost.git
 cd omnihost
+
+# Set up development environment
 python3 -m venv venv
 source venv/bin/activate  # On Windows: venv\Scripts\activate
 pip install -e .
+
+# Create a feature branch
+git checkout -b feat/your-feature-name
+# or
+git checkout -b fix/bug-description
+
+# Make your changes and commit using conventional commits
+git commit -m "feat(commands): add new feature"
+git commit -m "fix(ssh): resolve connection issue"
+git commit -m "docs(readme): update installation guide"
 ```
+
+### Commit Guidelines
+
+We follow [Conventional Commits](https://www.conventionalcommits.org/):
+
+- `feat:` New feature
+- `fix:` Bug fix
+- `docs:` Documentation changes
+- `perf:` Performance improvements
+- `refactor:` Code refactoring
+- `test:` Tests
+- `ci:` CI/CD changes
+- `chore:` Maintenance
+
+**Example:** `feat(bulk): add connection pooling for 3x faster execution`
+
+See [CONTRIBUTING.md](CONTRIBUTING.md) for full guidelines and examples.
 
 ## 📄 License
 
