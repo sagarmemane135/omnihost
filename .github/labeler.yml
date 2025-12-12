@@ -1,0 +1,42 @@
+# Auto-labeling configuration
+# See: https://github.com/actions/labeler
+
+# Documentation changes
+documentation:
+  - changed-files:
+    - any-glob-to-any-file: ['docs/**', '*.md', 'man/**']
+
+# Python code changes
+python:
+  - changed-files:
+    - any-glob-to-any-file: ['**/*.py']
+
+# Tests
+tests:
+  - changed-files:
+    - any-glob-to-any-file: ['tests/**', '**/test_*.py']
+
+# CI/CD
+ci:
+  - changed-files:
+    - any-glob-to-any-file: ['.github/**']
+
+# Dependencies
+dependencies:
+  - changed-files:
+    - any-glob-to-any-file: ['requirements*.txt', 'pyproject.toml', 'setup.py']
+
+# Configuration
+configuration:
+  - changed-files:
+    - any-glob-to-any-file: ['**/*.yml', '**/*.yaml', '**/*.toml', '**/*.json']
+
+# Core functionality
+core:
+  - changed-files:
+    - any-glob-to-any-file: ['remotex/cli.py', 'remotex/ssh_client.py', 'remotex/config.py']
+
+# Commands
+commands:
+  - changed-files:
+    - any-glob-to-any-file: ['remotex/commands/**']

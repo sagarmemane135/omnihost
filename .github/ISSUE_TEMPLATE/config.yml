@@ -1,0 +1,11 @@
+blank_issues_enabled: false
+contact_links:
+  - name: 💬 Ask a Question
+    url: https://github.com/sagarmemane135/remotex/discussions
+    about: Ask questions and discuss with the community
+  - name: 📖 Documentation
+    url: https://github.com/sagarmemane135/remotex#readme
+    about: Read the documentation
+  - name: 🔒 Security Issue
+    url: https://github.com/sagarmemane135/remotex/security/advisories/new
+    about: Report a security vulnerability privately

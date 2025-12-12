@@ -1,0 +1,34 @@
+# Code Owners for RemoteX
+# This file defines individuals or teams responsible for code in this repository
+# See: https://docs.github.com/en/repositories/managing-your-repositorys-settings-and-features/customizing-your-repository/about-code-owners
+
+# Default owners for everything in the repo
+* @sagarmemane135
+
+# Core modules
+/remotex/ @sagarmemane135
+/remotex/cli.py @sagarmemane135
+/remotex/ssh_client.py @sagarmemane135
+/remotex/config.py @sagarmemane135
+
+# GitHub Actions and CI/CD
+/.github/ @sagarmemane135
+/.github/workflows/ @sagarmemane135
+
+# Documentation
+/docs/ @sagarmemane135
+README.md @sagarmemane135
+CONTRIBUTING.md @sagarmemane135
+CHANGELOG.md @sagarmemane135
+
+# Security
+SECURITY.md @sagarmemane135
+/.github/workflows/security-scan.yml @sagarmemane135
+
+# Package configuration
+pyproject.toml @sagarmemane135
+requirements.txt @sagarmemane135
+setup.py @sagarmemane135
+
+# Tests
+/tests/ @sagarmemane135
